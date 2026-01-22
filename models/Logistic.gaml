@@ -7,18 +7,18 @@ global {
 	// --- TIME & SPACE ---
 	// Step = 10 seconds. This creates the "Smooth Animation" and "Continuous Physics"
 	float step <- 10 #sec;
-	geometry shape <- square(100 #m);
+	geometry shape <- square(80 #m);
 	graph road_network;
 
 	// --- PHYSICS CONSTANTS ---
 	float traffic_multiplier <- 1.0;
-	float base_speed <- 60.0 #km / #h;
+	float base_speed <- 0.6 #km / #h;
 
 	// Energy: 0.2 kWh per km (Real-world average for delivery vans)
-	float energy_per_meter <- 0.02;
+	float energy_per_meter <- 0.2;
 
 	// --- DEMAND SETTINGS ---
-	int initial_customers <- 48;
+	int initial_customers <- 15;
 	int size <- 0;
 	// Probability scaled to 10s steps (approx 1 order every few minutes)
 	float new_order_probability <- 0.00;
@@ -27,53 +27,101 @@ global {
 	init {
 	// 1. GENERATE ROADS (Connected Graph)
 	// Tạo agent từ file
-	//		create road_node from: my_csv_file with: [
-	//		// Đọc cột "X_Coord" và "Y_Coord" để tạo vị trí (location)
-	//		// Lưu ý: location là biến có sẵn của agent
-	//		location::{float(read("x")), float(read("y"))},
-	//		// Đọc các thuộc tính khác nếu có
-	//		my_name::read("id")];
-		create road_node number: 50 {
-		}
+		create road_node from: my_csv_file with: [
+		// Đọc cột "X_Coord" và "Y_Coord" để tạo vị trí (location)
+		// Lưu ý: location là biến có sẵn của agent
+		location::{float(read("x")), float(read("y"))},
+		// Đọc các thuộc tính khác nếu có
+		my_name::read("id")];
+		//		create road_node number: 50 {
+		//		}
 
-		list<road_node> shuffled_nodes <- shuffle(road_node);
-		int n_customers <- min([initial_customers, length(shuffled_nodes)]);
+		//		list<point> node_locations <- road_node collect each.location;
+		//		list<geometry> triangles <- triangulate(node_locations);
+		//		
+		//		loop tri over: triangles {
+		//			list<point> pts <- tri.points;
+		//			loop i from: 0 to: length(pts) - 2 {
+		//				create road {
+		//					visited <- false;
+		//					shape <- line([pts[i], pts[i + 1]]);
+		//					// Baseline travel time [cite: 8]
+		//					t_ij <- shape.perimeter / base_speed;
+		//				}
+		//
+		//			}
+		//
+		//		}
 		list<point> node_locations <- road_node collect each.location;
 		list<geometry> triangles <- triangulate(node_locations);
 		loop tri over: triangles {
+		// Mỗi tam giác có 3 cạnh, ta tạo road cho từng cạnh
 			list<point> pts <- tri.points;
-			loop i from: 0 to: length(pts) - 2 {
-				create road {
-					visited <- false;
-					shape <- line([pts[i], pts[i + 1]]);
-					// Baseline travel time [cite: 8]
-					t_ij <- shape.perimeter / base_speed;
+			loop i from: 0 to: 2 {
+				point p1 <- pts[i];
+				point p2 <- (i = 2) ? pts[0] : pts[i + 1];
+
+				// Kiểm tra tránh tạo trùng lặp đường (cạnh chung giữa 2 tam giác)
+				if empty(road where ((each.shape.points contains p1) and (each.shape.points contains p2))) {
+					create road {
+						shape <- line([p1, p2]);
+						// Tính toán thời gian di chuyển cơ bản dựa trên chiều dài đường
+						t_ij <- shape.perimeter / base_speed;
+					}
+
 				}
 
 			}
 
 		}
 
+		int n_customers <- min([initial_customers, length(road_node)]);
 		road_network <- as_edge_graph(road);
 
 		// 2. INFRASTRUCTURE [cite: 57-60]
-		create depot number: 1 {
-			location <- one_of(road_node).location;
+		road_node node_depot <- first(road_node where (each.my_name = "1"));
+		if (node_depot != nil) {
+			create depot {
+				location <- node_depot.location;
+				my_name <- "Depot Central";
+			}
+
+		}
+		//		create depot number: 1 {
+		//			location <- one_of(road_node).location;
+		//		}
+		list<road_node> nodes_charging <- road_node where (each.my_name = "13" or each.my_name = "1");
+		ask nodes_charging {
+			create charging_station {
+				location <- myself.location;
+				max_power <- 50.0;
+				num_plugs <- 2;
+			}
+
 		}
 
-		create charging_station number: num_stations {
-			location <- one_of(road_node).location;
-			max_power <- 50.0; // 50 kW charging speed
-			num_plugs <- 2;
-		}
+		//		create charging_station number: num_stations {
+		//			location <- one_of(road_node).location;
+		//			max_power <- 50.0; // 50 kW charging speed
+		//			num_plugs <- 2;
+		//		}
 
 		// 3. INITIAL CUSTOMERS
-		create customer number: n_customers {
-			location <- shuffled_nodes[self.index].location;
-			demand <- rnd(10.0, 20.0);
-			status <- "active";
-			release_time <- 0.0;
+		list<road_node> nodes_customer <- road_node where (each.my_name != "1" and each.my_name != "13");
+		ask nodes_customer {
+			create customer {
+				location <- myself.location;
+				demand <- rnd(10.0, 20.0);
+				status <- "active";
+			}
+
 		}
+		//		create customer number: n_customers {
+		//			location <- road_node[self.index].location;
+		//			demand <- rnd(10.0, 20.0);
+		//			status <- "active";
+		//			release_time <- 0.0;
+		//		}
 
 		// 4. EV AGENT [cite: 29-32]
 		create ev_driver number: 1 {
@@ -127,7 +175,7 @@ species road_node {
 	//	}
 	aspect default {
 		draw circle(1 + size #m) color: #gray;
-		//		draw my_name color: #black size: 10 at: location + {0, 0, 2};
+		draw my_name color: #black size: 10 at: location + {0, 0, 1};
 	}
 
 }
@@ -223,11 +271,11 @@ species ev_driver skills: [moving] {
 		//			r.visited <- true;
 		//		}
 		if (current_edge != nil) {
-		// Ép kiểu current_edge về my_edge và đổi màu
-			ask road(current_edge) {
+			list<road> rr <- road where (each covers current_edge);
+			ask rr {
 				color <- #red; // Đổi màu thành đỏ
 			}
-
+			// Ép kiểu current_edge về my_edge và đổi màu
 		}
 		// 4. Calculate REAL Distance Traveled
 		float distance_traveled <- previous_loc distance_to location;
@@ -240,7 +288,7 @@ species ev_driver skills: [moving] {
 		}
 
 		// 6. Arrival Check
-		if (location distance_to target_loc < 5.0 #m) {
+		if (location distance_to target_loc < 0.05 #m) {
 			location <- target_loc;
 			if (target_agent is customer) {
 				status <- "serving";
@@ -298,6 +346,8 @@ species ev_driver skills: [moving] {
 		draw string(int(current_battery)) + "%" color: #black size: 12 at: location + {0, -2};
 		draw status color: #black size: 15 at: location + {0, 5};
 		if (target_loc != nil) {
+		//			write "draw "+location;
+		//			write "draw "+target_loc;
 			draw line([location, target_loc]) color: #purple width: 2;
 		}
 
@@ -309,7 +359,7 @@ experiment DigitalTwin_GUI type: gui {
 	parameter "Scenario Type" var: scenario_type;
 	//	parameter "New Order Probability" var: new_order_probability min: 0.00 max: 0.1;
 	output {
-		display map_view {
+		display map_view background: #white {
 			species road;
 			species road_node;
 			species depot;
