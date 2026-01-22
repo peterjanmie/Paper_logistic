@@ -15,4 +15,11 @@
 		<nature>org.eclipse.xtext.ui.shared.xtextNature</nature>
 		<nature>gama.ui.application.gamaNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>models/New Model1.gaml</name>
+			<type>1</type>
+			<location>C:/Users/Asus/Downloads/Paper_ADUC/New Model1.gaml</location>
+		</link>
+	</linkedResources>
 </projectDescription>
