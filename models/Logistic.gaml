@@ -3,7 +3,7 @@ model EVDeliveryDigitalTwin
 global {
 // --- SCENARIO PARAMETERS [cite: 88-100] ---
 	int scenario_type <- 0;
-	file my_csv_file <- csv_file("nodes.csv");
+	//	file my_csv_file <- csv_file("nodes.csv");
 	// --- TIME & SPACE ---
 	// Step = 10 seconds. This creates the "Smooth Animation" and "Continuous Physics"
 	float step <- 10 #sec;
@@ -27,6 +27,7 @@ global {
 	init {
 	// 1. GENERATE ROADS (Connected Graph)
 	// Tạo agent từ file
+<<<<<<< HEAD
 		create road_node from: my_csv_file with: [
 		// Đọc cột "X_Coord" và "Y_Coord" để tạo vị trí (location)
 		// Lưu ý: location là biến có sẵn của agent
@@ -75,6 +76,34 @@ global {
 
 		}
 
+=======
+	//		create road_node from: my_csv_file with: [
+	//		// Đọc cột "X_Coord" và "Y_Coord" để tạo vị trí (location)
+	//		// Lưu ý: location là biến có sẵn của agent
+	//		location::{float(read("x")), float(read("y"))},
+	//		// Đọc các thuộc tính khác nếu có
+	//		my_name::read("id")];
+	//		create road_node number: 50 {
+	//		}
+
+	//		list<point> node_locations <- road_node collect each.location;
+	//		list<geometry> triangles <- triangulate(node_locations);
+	//		
+	//		loop tri over: triangles {
+	//			list<point> pts <- tri.points;
+	//			loop i from: 0 to: length(pts) - 2 {
+	//				create road {
+	//					visited <- false;
+	//					shape <- line([pts[i], pts[i + 1]]);
+	//					// Baseline travel time [cite: 8]
+	//					t_ij <- shape.perimeter / base_speed;
+	//				}
+	//
+	//			}
+	//
+	//		}
+		road_network <- generate_random_graph(10, 40, false, road_node, road);
+>>>>>>> eb11f396a57f26422841181a0697e4715072987f
 		int n_customers <- min([initial_customers, length(road_node)]);
 		road_network <- as_edge_graph(road);
 
@@ -107,6 +136,7 @@ global {
 		//		}
 
 		// 3. INITIAL CUSTOMERS
+<<<<<<< HEAD
 		list<road_node> nodes_customer <- road_node where (each.my_name != "1" and each.my_name != "13");
 		ask nodes_customer {
 			create customer {
@@ -115,6 +145,13 @@ global {
 				status <- "active";
 			}
 
+=======
+		create customer number: n_customers {
+			location <- road_node[self.index].location;
+			demand <- rnd(10.0, 20.0);
+			status <- "active";
+			release_time <- 0.0;
+>>>>>>> eb11f396a57f26422841181a0697e4715072987f
 		}
 		//		create customer number: n_customers {
 		//			location <- road_node[self.index].location;
@@ -271,7 +308,11 @@ species ev_driver skills: [moving] {
 		//			r.visited <- true;
 		//		}
 		if (current_edge != nil) {
+<<<<<<< HEAD
 			list<road> rr <- road where (each covers current_edge);
+=======
+			list<road> rr <- road where (each covers current_edge); 
+>>>>>>> eb11f396a57f26422841181a0697e4715072987f
 			ask rr {
 				color <- #red; // Đổi màu thành đỏ
 			}
@@ -359,7 +400,11 @@ experiment DigitalTwin_GUI type: gui {
 	parameter "Scenario Type" var: scenario_type;
 	//	parameter "New Order Probability" var: new_order_probability min: 0.00 max: 0.1;
 	output {
+<<<<<<< HEAD
 		display map_view background: #white {
+=======
+		display map_view background: #black {
+>>>>>>> eb11f396a57f26422841181a0697e4715072987f
 			species road;
 			species road_node;
 			species depot;
@@ -368,13 +413,13 @@ experiment DigitalTwin_GUI type: gui {
 			species ev_driver;
 		}
 
-		display dashboard type: 2d {
-			chart "EV Battery Level (Real-time)" type: series {
-				data "Battery %" value: first(ev_driver).current_battery color: #red;
-				data "Safety Limit" value: 30.0 color: #black style: line;
-			}
-
-		}
+		//		display dashboard type: 2d {
+		//			chart "EV Battery Level (Real-time)" type: series {
+		//				data "Battery %" value: first(ev_driver).current_battery color: #red;
+		//				data "Safety Limit" value: 30.0 color: #black style: line;
+		//			}
+		//
+		//		}
 
 	}
 
